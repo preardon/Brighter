@@ -12,6 +12,8 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus.AzureServiceBusWrap
 
         Task DeadLetter(string lockToken);
 
+        Task Abandon(string lockToken);
+
         void Close();
         
         bool IsClosedOrClosing { get; }

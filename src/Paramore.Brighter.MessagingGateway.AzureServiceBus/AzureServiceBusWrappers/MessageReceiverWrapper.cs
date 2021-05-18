@@ -46,6 +46,11 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus.AzureServiceBusWrap
             await _messageReceiver.DeadLetterAsync(lockToken);
         }
 
+        public async Task Abandon(string lockToken)
+        {
+            await _messageReceiver.AbandonAsync(lockToken);
+        }
+
         public bool IsClosedOrClosing => _messageReceiver.IsClosedOrClosing;
     }
 }

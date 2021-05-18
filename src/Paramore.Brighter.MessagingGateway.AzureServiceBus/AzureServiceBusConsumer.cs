@@ -21,11 +21,12 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus
         private static readonly ILogger s_logger = ApplicationLogging.CreateLogger<AzureServiceBusConsumer>();
         private readonly OnMissingChannel _makeChannel;
         private readonly ReceiveMode _receiveMode;
+        private readonly bool _useAsbForRequeue;
 
         private const string _lockTokenKey = "LockToken";
         
         public AzureServiceBusConsumer(string topicName, string subscriptionName, IAmAMessageProducer messageProducer, IManagementClientWrapper managementClientWrapper, 
-            IMessageReceiverProvider messageReceiverProvider, int batchSize = 10, ReceiveMode receiveMode = ReceiveMode.ReceiveAndDelete, OnMissingChannel makeChannels = OnMissingChannel.Create)
+            IMessageReceiverProvider messageReceiverProvider, int batchSize = 10, ReceiveMode receiveMode = ReceiveMode.ReceiveAndDelete, OnMissingChannel makeChannels = OnMissingChannel.Create, bool useAsbForRequeue = false)
         {
             _subscriptionName = subscriptionName;
             _topicName = topicName;
@@ -35,7 +36,8 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus
             _batchSize = batchSize;
             _makeChannel = makeChannels;
             _receiveMode = receiveMode;
-            
+            _useAsbForRequeue = useAsbForRequeue;
+
             GetMessageReceiverProvider();
         }
 
@@ -172,13 +174,33 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus
 
             s_logger.LogInformation("Requeuing message with topic {Topic} and id {Id}.", topic, message.Id);
 
-            if (delayMilliseconds > 0)
+            if (_useAsbForRequeue && _receiveMode.Equals(ReceiveMode.PeekLock))
             {
-                _messageProducer.SendWithDelay(message, delayMilliseconds);
+                try
+                {
+                    var lockToken = message.Header.Bag[_lockTokenKey].ToString();
+                    if (string.IsNullOrEmpty(lockToken))
+                        throw new Exception($"LockToken for message with id {message.Id} is null or empty");
+                    s_logger.LogDebug("Acknowledging Message with Id {Id} Lock Token : {LockToken}", message.Id, lockToken);
+
+                    _messageReceiver.Abandon(lockToken).Wait();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
             }
             else
             {
-                _messageProducer.Send(message);
+                if (delayMilliseconds > 0)
+                {
+                    _messageProducer.SendWithDelay(message, delayMilliseconds);
+                }
+                else
+                {
+                    _messageProducer.Send(message);
+                }
             }
         }
 

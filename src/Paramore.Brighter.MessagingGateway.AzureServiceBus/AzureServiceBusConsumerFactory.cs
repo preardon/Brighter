@@ -22,7 +22,8 @@ namespace Paramore.Brighter.MessagingGateway.AzureServiceBus
                 new MessageReceiverProvider(_configuration),
                 makeChannels: subscription.MakeChannels,
                 receiveMode: _configuration.AckOnRead ? ReceiveMode.PeekLock : ReceiveMode.ReceiveAndDelete,
-                batchSize: subscription.BufferSize);
+                batchSize: subscription.BufferSize,
+                UseAsbForRequeue: _configuration.UseAsbForRequeue);
         }
     }
 }
